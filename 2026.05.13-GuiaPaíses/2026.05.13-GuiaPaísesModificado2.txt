@@ -1,0 +1,660 @@
+import React, { useEffect, useState } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  ActivityIndicator,
+  StyleSheet,
+  ScrollView,
+  Linking,
+  FlatList,
+  Alert,
+  Switch,
+} from 'react-native';
+
+export default function App() {
+  const [paisDigitado, setPaisDigitado] = useState('');
+  const [letra, setLetra] = useState('');
+  const [pais, setPais] = useState(null);
+  const [todosPaises, setTodosPaises] = useState([]);
+  const [carregando, setCarregando] = useState(false);
+  const [erro, setErro] = useState('');
+  const [favoritos, setFavoritos] = useState([]);
+  const [darkMode, setDarkMode] = useState(false);
+  const [quizPais, setQuizPais] = useState(null);
+  const [mostrarQuiz, setMostrarQuiz] = useState(false);
+
+  const tema = darkMode ? dark : light;
+
+  useEffect(() => {
+    carregarTodosPaises();
+  }, []);
+
+  async function carregarTodosPaises() {
+    try {
+      const resposta = await fetch('https://restcountries.com/v3.1/all');
+      const dados = await resposta.json();
+
+      const ordenados = dados.sort((a, b) =>
+        b.population - a.population
+      );
+
+      setTodosPaises(ordenados);
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  async function buscarPais() {
+    if (paisDigitado.trim() === '') {
+      setErro('Digite um país.');
+      return;
+    }
+
+    try {
+      setCarregando(true);
+      setErro('');
+
+      const resposta = await fetch(
+        `https://restcountries.com/v3.1/name/${paisDigitado}`
+      );
+
+      if (!resposta.ok) {
+        throw new Error();
+      }
+
+      const dados = await resposta.json();
+
+      setPais(dados[0]);
+    } catch {
+      setErro('País não encontrado.');
+      setPais(null);
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  async function buscarPaisAleatorio() {
+    try {
+      setCarregando(true);
+
+      const resposta = await fetch(
+        'https://restcountries.com/v3.1/all'
+      );
+
+      const dados = await resposta.json();
+
+      const aleatorio =
+        dados[Math.floor(Math.random() * dados.length)];
+
+      setPais(aleatorio);
+    } catch {
+      setErro('Erro ao buscar país.');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  async function buscarPorLetra() {
+    if (letra.trim() === '') {
+      setErro('Digite uma letra.');
+      return;
+    }
+
+    try {
+      setCarregando(true);
+
+      const resposta = await fetch(
+        'https://restcountries.com/v3.1/all'
+      );
+
+      const dados = await resposta.json();
+
+      const filtrados = dados.filter((p) =>
+        p.name.common
+          .toLowerCase()
+          .startsWith(letra.toLowerCase())
+      );
+
+      if (filtrados.length === 0) {
+        throw new Error();
+      }
+
+      const aleatorio =
+        filtrados[Math.floor(Math.random() * filtrados.length)];
+
+      setPais(aleatorio);
+    } catch {
+      setErro('Nenhum país encontrado.');
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  function adicionarFavorito() {
+    if (!pais) return;
+
+    const existe = favoritos.find(
+      (item) => item.name.common === pais.name.common
+    );
+
+    if (existe) {
+      Alert.alert('Esse país já está nos favoritos.');
+      return;
+    }
+
+    setFavoritos([...favoritos, pais]);
+
+    Alert.alert('País adicionado aos favoritos!');
+  }
+
+  function iniciarQuiz() {
+    const aleatorio =
+      todosPaises[
+        Math.floor(Math.random() * todosPaises.length)
+      ];
+
+    setQuizPais(aleatorio);
+    setMostrarQuiz(true);
+  }
+
+  function responderQuiz(resposta) {
+    if (!quizPais) return;
+
+    if (
+      resposta.toLowerCase() ===
+      quizPais.name.common.toLowerCase()
+    ) {
+      Alert.alert('🎉 Acertou!');
+    } else {
+      Alert.alert(
+        '❌ Errou',
+        `Resposta correta: ${quizPais.name.common}`
+      );
+    }
+
+    setMostrarQuiz(false);
+  }
+
+  function formatarNumero(numero) {
+    return Number(numero).toLocaleString('pt-BR');
+  }
+
+  function obterIdiomas() {
+    if (!pais?.languages) return 'Não informado';
+
+    return Object.values(pais.languages).join(', ');
+  }
+
+  function obterMoedas() {
+    if (!pais?.currencies) return 'Não informado';
+
+    return Object.values(pais.currencies)
+      .map(
+        (m) => `${m.name} (${m.symbol || 'Sem símbolo'})`
+      )
+      .join(', ');
+  }
+
+  return (
+    <ScrollView
+      contentContainerStyle={[
+        styles.container,
+        { backgroundColor: tema.background },
+      ]}
+    >
+      <Text style={[styles.titulo, { color: tema.text }]}>
+        🌎 Guia Mundial
+      </Text>
+
+      <View style={styles.darkContainer}>
+        <Text style={{ color: tema.text }}>
+          🌙 Dark Mode
+        </Text>
+
+        <Switch
+          value={darkMode}
+          onValueChange={setDarkMode}
+        />
+      </View>
+
+      <TextInput
+        style={[
+          styles.input,
+          {
+            backgroundColor: tema.card,
+            color: tema.text,
+            borderColor: tema.border,
+          },
+        ]}
+        placeholder="Digite um país"
+        placeholderTextColor="#999"
+        value={paisDigitado}
+        onChangeText={setPaisDigitado}
+      />
+
+      <TouchableOpacity
+        style={styles.botao}
+        onPress={buscarPais}
+      >
+        <Text style={styles.textoBotao}>
+          Buscar País
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.botaoAleatorio}
+        onPress={buscarPaisAleatorio}
+      >
+        <Text style={styles.textoBotao}>
+          🎲 País Aleatório
+        </Text>
+      </TouchableOpacity>
+
+      <TextInput
+        style={[
+          styles.input,
+          {
+            backgroundColor: tema.card,
+            color: tema.text,
+            borderColor: tema.border,
+          },
+        ]}
+        placeholder="Digite uma letra"
+        placeholderTextColor="#999"
+        maxLength={1}
+        value={letra}
+        onChangeText={setLetra}
+      />
+
+      <TouchableOpacity
+        style={styles.botaoLetra}
+        onPress={buscarPorLetra}
+      >
+        <Text style={styles.textoBotao}>
+          🔤 País Aleatório por Letra
+        </Text>
+      </TouchableOpacity>
+
+      <TouchableOpacity
+        style={styles.botaoQuiz}
+        onPress={iniciarQuiz}
+      >
+        <Text style={styles.textoBotao}>
+          🏆 Quiz de Bandeiras
+        </Text>
+      </TouchableOpacity>
+
+      {mostrarQuiz && quizPais && (
+        <View
+          style={[
+            styles.quizContainer,
+            { backgroundColor: tema.card },
+          ]}
+        >
+          <Image
+            source={{ uri: quizPais.flags.png }}
+            style={styles.quizFlag}
+          />
+
+          <Text style={{ color: tema.text }}>
+            Qual é este país?
+          </Text>
+
+          <TouchableOpacity
+            style={styles.quizButton}
+            onPress={() =>
+              responderQuiz(quizPais.name.common)
+            }
+          >
+            <Text style={styles.textoBotao}>
+              {quizPais.name.common}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.quizButton}
+            onPress={() => responderQuiz('Brasil')}
+          >
+            <Text style={styles.textoBotao}>
+              Brasil
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {carregando && (
+        <ActivityIndicator
+          size="large"
+          color="#2563EB"
+          style={{ marginTop: 20 }}
+        />
+      )}
+
+      {erro !== '' && (
+        <Text style={styles.erro}>{erro}</Text>
+      )}
+
+      {pais && (
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: tema.card },
+          ]}
+        >
+          <Image
+            source={{ uri: pais.flags.png }}
+            style={styles.bandeira}
+          />
+
+          <Text
+            style={[
+              styles.nomePais,
+              { color: tema.text },
+            ]}
+          >
+            {pais.flag} {pais.name.common}
+          </Text>
+
+          <Text style={{ color: tema.text }}>
+            {pais.name.official}
+          </Text>
+
+          <View style={styles.infoBox}>
+            <Text style={[styles.info, { color: tema.text }]}>
+              🏛 Capital: {pais.capital?.[0]}
+            </Text>
+
+            <Text style={[styles.info, { color: tema.text }]}>
+              🌍 Região: {pais.region}
+            </Text>
+
+            <Text style={[styles.info, { color: tema.text }]}>
+              👥 População:
+              {formatarNumero(pais.population)}
+            </Text>
+
+            <Text style={[styles.info, { color: tema.text }]}>
+              📏 Área: {formatarNumero(pais.area)} km²
+            </Text>
+
+            <Text style={[styles.info, { color: tema.text }]}>
+              🗣 Idiomas: {obterIdiomas()}
+            </Text>
+
+            <Text style={[styles.info, { color: tema.text }]}>
+              💰 Moedas: {obterMoedas()}
+            </Text>
+
+            <Text style={[styles.info, { color: tema.text }]}>
+              ⏰ Fuso:
+              {pais.timezones?.join(', ')}
+            </Text>
+
+            <Text style={[styles.info, { color: tema.text }]}>
+              🌐 Domínio:
+              {pais.tld?.join(', ')}
+            </Text>
+
+            <Text style={[styles.info, { color: tema.text }]}>
+              ⚽ FIFA: {pais.fifa || 'N/A'}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.botaoFavorito}
+            onPress={adicionarFavorito}
+          >
+            <Text style={styles.textoBotao}>
+              ⭐ Favoritar
+            </Text>
+          </TouchableOpacity>
+
+          {pais.maps?.googleMaps && (
+            <TouchableOpacity
+              style={styles.botaoMapa}
+              onPress={() =>
+                Linking.openURL(pais.maps.googleMaps)
+              }
+            >
+              <Text style={styles.textoBotao}>
+                Abrir no Google Maps
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
+
+      <View style={{ width: '100%', marginTop: 30 }}>
+        <Text
+          style={[
+            styles.rankTitulo,
+            { color: tema.text },
+          ]}
+        >
+          📈 Top Países Mais Populosos
+        </Text>
+
+        {todosPaises.slice(0, 10).map((item, index) => (
+          <View
+            key={index}
+            style={[
+              styles.rankItem,
+              { backgroundColor: tema.card },
+            ]}
+          >
+            <Text style={{ color: tema.text }}>
+              {index + 1}. {item.flag} {item.name.common}
+            </Text>
+
+            <Text style={{ color: tema.text }}>
+              👥 {formatarNumero(item.population)}
+            </Text>
+          </View>
+        ))}
+      </View>
+
+      <View style={{ width: '100%', marginTop: 30 }}>
+        <Text
+          style={[
+            styles.rankTitulo,
+            { color: tema.text },
+          ]}
+        >
+          ⭐ Favoritos
+        </Text>
+
+        <FlatList
+          data={favoritos}
+          keyExtractor={(item) => item.name.common}
+          renderItem={({ item }) => (
+            <View
+              style={[
+                styles.favoritoItem,
+                { backgroundColor: tema.card },
+              ]}
+            >
+              <Text style={{ color: tema.text }}>
+                {item.flag} {item.name.common}
+              </Text>
+            </View>
+          )}
+        />
+      </View>
+    </ScrollView>
+  );
+}
+
+const light = {
+  background: '#F1F5F9',
+  card: '#FFFFFF',
+  text: '#0F172A',
+  border: '#CBD5E1',
+};
+
+const dark = {
+  background: '#0F172A',
+  card: '#1E293B',
+  text: '#FFFFFF',
+  border: '#334155',
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flexGrow: 1,
+    padding: 20,
+    paddingTop: 60,
+  },
+
+  titulo: {
+    fontSize: 30,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 20,
+  },
+
+  darkContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+
+  input: {
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+  },
+
+  botao: {
+    backgroundColor: '#2563EB',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  botaoAleatorio: {
+    backgroundColor: '#7C3AED',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  botaoLetra: {
+    backgroundColor: '#EA580C',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+
+  botaoQuiz: {
+    backgroundColor: '#DC2626',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+
+  textoBotao: {
+    color: '#FFFFFF',
+    fontWeight: 'bold',
+    fontSize: 15,
+  },
+
+  erro: {
+    color: 'red',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+
+  card: {
+    borderRadius: 18,
+    padding: 20,
+    elevation: 5,
+  },
+
+  bandeira: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+
+  nomePais: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+
+  infoBox: {
+    marginTop: 20,
+    gap: 10,
+  },
+
+  info: {
+    fontSize: 16,
+  },
+
+  botaoMapa: {
+    marginTop: 20,
+    backgroundColor: '#16A34A',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+
+  botaoFavorito: {
+    marginTop: 20,
+    backgroundColor: '#F59E0B',
+    padding: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+
+  rankTitulo: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    marginBottom: 15,
+  },
+
+  rankItem: {
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+
+  favoritoItem: {
+    padding: 14,
+    borderRadius: 12,
+    marginBottom: 10,
+  },
+
+  quizContainer: {
+    padding: 20,
+    borderRadius: 18,
+    marginBottom: 20,
+    alignItems: 'center',
+  },
+
+  quizFlag: {
+    width: 200,
+    height: 120,
+    borderRadius: 12,
+    marginBottom: 15,
+  },
+
+  quizButton: {
+    backgroundColor: '#2563EB',
+    padding: 12,
+    borderRadius: 10,
+    marginTop: 10,
+    width: '100%',
+    alignItems: 'center',
+  },
+});
