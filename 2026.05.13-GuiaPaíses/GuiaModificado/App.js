@@ -29,7 +29,7 @@ export default function App() {
       setErro('');
 
       const resposta = await fetch(
-        `https://restcountries.com/v3.1/name/${paisDigitado}`
+        `https://restcountries.com/v3.1/name/${paisDigitado}?fullText=true`
       );
 
       if (!resposta.ok) {
@@ -48,23 +48,47 @@ export default function App() {
   }
 
   async function buscarPaisAleatorio() {
-    try {
-      setCarregando(true);
-      setErro('');
+  try {
+    setCarregando(true);
+    setErro('');
 
-      const resposta = await fetch('https://restcountries.com/v3.1/all');
-      const dados = await resposta.json();
+    const resposta = await fetch(
+      'https://restcountries.com/v3.1/all?fields=name,flags,capital,region,latlng,subregion,population,languages,currencies,maps'
+    );
 
-      const aleatorio =
-        dados[Math.floor(Math.random() * dados.length)];
-
-      setPais(aleatorio);
-    } catch {
-      setErro('Erro ao buscar país aleatório.');
-    } finally {
-      setCarregando(false);
+    if (!resposta.ok) {
+      throw new Error('Erro na API');
     }
+
+    const dados = await resposta.json();
+    console.log(dados)
+
+    // Filtra apenas países válidos
+    const paisesValidos = dados.filter(
+      (p) =>
+        p?.name?.common &&
+        p?.flags?.png
+    );
+
+    // Sorteia um país
+    const indiceAleatorio = Math.floor(
+      Math.random() * paisesValidos.length
+    );
+
+    const aleatorio = paisesValidos[indiceAleatorio];
+
+    console.log('País sorteado:', aleatorio.name.common);
+
+    setPais(aleatorio);
+  } catch (error) {
+    console.log('ERRO:', error);
+
+    setErro('Erro ao buscar país aleatório.');
+    setPais(null);
+  } finally {
+    setCarregando(false);
   }
+}
 
   async function buscarPorLetra() {
     if (letra.trim() === '') {
@@ -76,7 +100,7 @@ export default function App() {
       setCarregando(true);
       setErro('');
 
-      const resposta = await fetch('https://restcountries.com/v3.1/all');
+      const resposta = await fetch('https://restcountries.com/v3.1/all?fields=name,flags,capital,region,latlng,subregion,population,languages,currencies,maps');
 
       const dados = await resposta.json();
 
@@ -259,7 +283,7 @@ export default function App() {
             </Text>
 
             <Text style={styles.info}>
-              استقلال:{' '}
+              🌐 Independente:: {' '}
               {pais.independent ? 'Sim' : 'Não'}
             </Text>
           </View>
